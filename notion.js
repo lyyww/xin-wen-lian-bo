@@ -89,9 +89,9 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
         parent: { database_id: DATABASE_ID },
         properties: {
             // 数据库必须包含名称为"标题"、"日期"、"摘要"的属性列
-            '标题': { title: [{ text: { content: `《新闻联播》${formattedDate}` } }] },
-            '日期': { date: { start: formattedDate } },
-            '摘要': { rich_text: [{ text: { content: abstract.substring(0, 2000) } }] }
+            'Title': { title: [{ text: { content: `《新闻联播》${formattedDate}` } }] },
+            'Date': { date: { start: formattedDate } },
+            'Abstract': { text: [{ text: { content: abstract.substring(0, 2000) } }] }
         },
         children: childrenBlocks
     };
