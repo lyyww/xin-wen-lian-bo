@@ -1,0 +1,42 @@
+name: Manual Date Test (20260413)
+
+on:
+  workflow_dispatch: # 手动触发测试
+
+jobs:
+  test_fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+
+    steps:
+      - uses: actions/checkout@v4
+        
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      # 【核心魔法步骤】使用 sed 命令在运行时修改日期，无需改动你的 index.js 原文件
+      - name: Inject Test Date
+        run: |
+          sed -i "s/const DATE = getDate();/const DATE = '20260413';/g" index.js
+          echo "已将 index.js 中的日期临时替换为 20260413"
+          
+      - name: Fetch News
+        run: node index.js
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          
+      - name: Commit and push
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@github.com"
+          git add news/ README.md
+          # 如果没有变化就跳过提交，防止报错
+          git commit -m "Test Update news 20260413" || true
+          git push
