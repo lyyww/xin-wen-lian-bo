@@ -1,4 +1,5 @@
 import fetch from './fetch.js';
+import { pushToNotion } from './notion.js';
 import jsdom from 'jsdom';
 const { JSDOM } = jsdom;
 import fs from 'fs';
@@ -185,4 +186,16 @@ await updateCatalogue({
 	date: DATE,
 	abstract: abstract
 });
+
+// 推送到Notion
+try {
+  await pushToNotion({
+    date: DATE,
+    abstract,
+    news,
+    newsLinks: newsList.news
+  });
+} catch (err) {
+  console.error('推送Notion失败:', err);
+}
 console.log('全部成功, 程序结束');
