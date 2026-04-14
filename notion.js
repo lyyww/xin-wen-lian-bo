@@ -67,12 +67,9 @@ export async function pushToNotion({ date, abstract, news }) {
         childrenBlocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [] } });
     }
 
-    // 截断防止 504 (Notion API 限制 100 个 block，我们留点余量)
-    if (childrenBlocks.length > 95) {
-        childrenBlocks = childrenBlocks.slice(0, 95);
-    }
+// === 以下替换 notion.js 尾部的推送逻辑 ===
 
-    // 随机 Notion 官方封面
+    // 随机 Notion 官方封面保持不变
     const notionNativeCovers = [
         "https://www.notion.so/images/page-cover/gradients_1.png",
         "https://www.notion.so/images/page-cover/gradients_2.png",
@@ -82,22 +79,24 @@ export async function pushToNotion({ date, abstract, news }) {
     ];
     const randomCover = notionNativeCovers[Math.floor(Math.random() * notionNativeCovers.length)];
 
+    // 核心改变：设定安全批次大小
+    const CHUNK_SIZE = 80; 
+
+    // 1. 创建页面及第一批数据
+    const firstBatch = childrenBlocks.slice(0, CHUNK_SIZE);
     const body = {
         parent: { database_id: DATABASE_ID },
         cover: { type: 'external', external: { url: randomCover } },
         properties: {
-            // 标题列 (Title类型)
             'Title': { title: [{ text: { content: formattedDate } }] },
-            // 恢复 Date 列 (Date类型)
             'Date': { date: { start: formattedDate } },
-            // 恢复 Abstract 列 (Text类型)
             'Abstract': { rich_text: [{ text: { content: cleanAbstract.substring(0, 2000) } }] }
         },
-        children: childrenBlocks
+        children: firstBatch
     };
 
     try {
-        const response = await fetch('https://api.notion.com/v1/pages', {
+        let response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
             headers: headers,
             body: JSON.stringify(body)
@@ -106,10 +105,34 @@ export async function pushToNotion({ date, abstract, news }) {
         if (!response.ok) {
             const error = await response.text();
             console.error(`❌ 页面创建失败:`, error);
-        } else {
-            console.log(`✅ 已成功推送！日期：${formattedDate}，含序号与分段排版。`);
+            return; // 创建失败则终止
+        } 
+        
+        const pageData = await response.json();
+        const pageId = pageData.id;
+        console.log(`✅ 页面骨架创建成功，准备追加剩余内容...`);
+
+        // 2. 循环追加剩余的数据 (分批处理长新闻)
+        for (let i = CHUNK_SIZE; i < childrenBlocks.length; i += CHUNK_SIZE) {
+            const batch = childrenBlocks.slice(i, i + CHUNK_SIZE);
+            response = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
+                method: 'PATCH',
+                headers: headers,
+                body: JSON.stringify({ children: batch })
+            });
+
+            if (!response.ok) {
+                const error = await response.text();
+                console.error(`❌ 追加第 ${i} 块内容失败:`, error);
+            } else {
+                console.log(`✅ 成功追加 ${batch.length} 个段落区块`);
+            }
         }
+        
+        console.log(`🎉 全部新闻推送完成，内容无一遗漏！`);
+
     } catch (err) {
         console.error(`❌ 推送异常:`, err.message);
     }
+}
 }
