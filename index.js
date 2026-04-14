@@ -96,10 +96,23 @@ const getNewsList = async date => {
 const getAbstract = async link => {
 	const HTML = await fetch(link);
 	const dom = new JSDOM(HTML);
-	const abstract = dom.window.document.querySelector(
+	
+	// 获取节点对象
+	const abstractNode = dom.window.document.querySelector(
 		'#page_body > div.allcontent > div.video18847 > div.playingCon > div.nrjianjie_shadow > div > ul > li:nth-child(1) > p'
-	).innerHTML.replaceAll('；', "；\n\n").replaceAll('：', "：\n\n");
-	console.log('成功获取新闻简介');
+	);
+
+	// 使用可选链操作符 (?.) 进行容错处理，并设置默认回退文本
+	const abstract = abstractNode?.innerHTML
+		?.replaceAll('；', "；\n\n")
+		?.replaceAll('：', "：\n\n") || "今日新闻摘要获取失败（可能由于目标网页结构变更）。";
+
+	if (abstractNode) {
+		console.log('成功获取新闻简介');
+	} else {
+		console.log('未找到新闻简介节点，已使用默认回退文本');
+	}
+	
 	return abstract;
 }
 
