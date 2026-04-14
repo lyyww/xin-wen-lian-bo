@@ -19,7 +19,7 @@ export async function pushToNotion({ date, abstract, news }) {
 
     let childrenBlocks = [];
 
-    // 1. 恢复摘要展示 (Callout 块)
+    // 1. 摘要展示 (Callout 块)
     const cleanAbstract = abstract ? abstract.replace(/<[^>]+>/g, '').trim() : '今日无摘要';
     childrenBlocks.push({
         object: 'block',
@@ -45,12 +45,12 @@ export async function pushToNotion({ date, abstract, news }) {
             }
         });
 
-        // 【关键】分段处理：根据 <p> 标签拆分内容，确保在 Notion 里是多段文字
+        // 分段处理：根据 <p> 或 <br> 拆分内容，确保在 Notion 里是多段文字
         if (item.content) {
             const paragraphs = item.content
-                .split(/<\/p>|<br\/?>/i) // 根据段落或换行符拆分
-                .map(p => p.replace(/<[^>]+>/g, '').trim()) // 删掉所有内部标签
-                .filter(p => p.length > 0); // 过滤掉空行
+                .split(/<\/p>|<br\/?>/i)
+                .map(p => p.replace(/<[^>]+>/g, '').trim())
+                .filter(p => p.length > 0);
 
             for (const pText of paragraphs) {
                 childrenBlocks.push({
@@ -63,13 +63,13 @@ export async function pushToNotion({ date, abstract, news }) {
             }
         }
         
-        // 每条新闻后面加个分割占位
+        // 每条新闻后面加个空行
         childrenBlocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [] } });
     }
 
-// === 以下替换 notion.js 尾部的推送逻辑 ===
+    // --- 开始推送逻辑 (分批追加模式) ---
 
-    // 随机 Notion 官方封面保持不变
+    // 随机 Notion 官方封面
     const notionNativeCovers = [
         "https://www.notion.so/images/page-cover/gradients_1.png",
         "https://www.notion.so/images/page-cover/gradients_2.png",
@@ -79,7 +79,6 @@ export async function pushToNotion({ date, abstract, news }) {
     ];
     const randomCover = notionNativeCovers[Math.floor(Math.random() * notionNativeCovers.length)];
 
-    // 核心改变：设定安全批次大小
     const CHUNK_SIZE = 80; 
 
     // 1. 创建页面及第一批数据
@@ -105,14 +104,14 @@ export async function pushToNotion({ date, abstract, news }) {
         if (!response.ok) {
             const error = await response.text();
             console.error(`❌ 页面创建失败:`, error);
-            return; // 创建失败则终止
+            return;
         } 
         
         const pageData = await response.json();
         const pageId = pageData.id;
-        console.log(`✅ 页面骨架创建成功，准备追加剩余内容...`);
+        console.log(`✅ 页面骨架创建成功，正在搬运剩余新闻...`);
 
-        // 2. 循环追加剩余的数据 (分批处理长新闻)
+        // 2. 循环追加剩余的数据 (解决内容过长丢弃问题)
         for (let i = CHUNK_SIZE; i < childrenBlocks.length; i += CHUNK_SIZE) {
             const batch = childrenBlocks.slice(i, i + CHUNK_SIZE);
             response = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
@@ -125,14 +124,13 @@ export async function pushToNotion({ date, abstract, news }) {
                 const error = await response.text();
                 console.error(`❌ 追加第 ${i} 块内容失败:`, error);
             } else {
-                console.log(`✅ 成功追加 ${batch.length} 个段落区块`);
+                console.log(`✅ 成功追加 ${batch.length} 个段落块`);
             }
         }
         
-        console.log(`🎉 全部新闻推送完成，内容无一遗漏！`);
+        console.log(`🎉 全部新闻推送完成！`);
 
     } catch (err) {
         console.error(`❌ 推送异常:`, err.message);
     }
-}
 }
