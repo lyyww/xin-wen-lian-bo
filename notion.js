@@ -84,14 +84,22 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
         console.log('⚠️ 新闻条目过多，为符合 Notion API 限制，已截断部分正文内容。');
     }
 
-    // 2. 构建页面属性 (Properties)
+// 2. 构建页面属性 (Properties)
     const body = {
         parent: { database_id: DATABASE_ID },
         properties: {
-            // 数据库必须包含名称为"标题"、"日期"、"摘要"的属性列
-            'Title': { title: [{ text: { content: `《新闻联播》${formattedDate}` } }] },
-            'Date': { date: { start: formattedDate } },
-            'Abstract': { text: [{ text: { content: abstract.substring(0, 2000) } }] }
+            // 请确保你的 Notion 数据库第一列（Title类型）的名字叫 Title
+            'Title': { 
+                title: [{ text: { content: `《新闻联播》${formattedDate}` } }] 
+            },
+            // 请确保 Date 列的名字叫 Date
+            'Date': { 
+                date: { start: formattedDate } 
+            },
+            // 请确保摘要列的名字叫 Abstract，且类型为 Text (Rich text)
+            'Abstract': { 
+                rich_text: [{ text: { content: abstract ? abstract.substring(0, 2000) : '未获取到摘要' } }] 
+            }
         },
         children: childrenBlocks
     };
