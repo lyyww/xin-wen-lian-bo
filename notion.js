@@ -90,7 +90,7 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
         properties: {
             // 请确保你的 Notion 数据库第一列（Title类型）的名字叫 Title
             'Title': { 
-                title: [{ text: { content: `《新闻联播》${formattedDate}` } }] 
+                title: [{ text: { content: `${formattedDate}` } }] 
             },
             // 请确保 Date 列的名字叫 Date
             'Date': { 
