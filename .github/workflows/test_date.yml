@@ -23,7 +23,7 @@ jobs:
       # 【核心魔法步骤】使用 sed 命令在运行时修改日期，无需改动你的 index.js 原文件
       - name: Inject Test Date
         run: |
-          sed -i "s/const DATE = getDate();/const DATE = '20260413';/g" index.js
+          sed -i "s/const DATE = getDate();/const DATE = '20260412';/g" index.js
           echo "已将 index.js 中的日期临时替换为 20260413"
           
       - name: Fetch News
