@@ -1,0 +1,34 @@
+name: Fetch News Daily
+
+on:
+  schedule:
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Fetch News
+        run: node index.js
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+      
+      - name: Commit and push
+        run: |
+          git config user.name "news-bot"
+          git config user.email "news-bot@github.com"
+          git add news/ README.md
+          git commit -m "Update news $(date +%Y%m%d)" || true
+          git push
