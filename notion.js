@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
-export async function pushToNotion({ date, abstract, news, newsLinks }) {
+export async function pushToNotion({ date, news }) {
     if (!NOTION_API_KEY || !DATABASE_ID) {
         console.log('⚠️ Notion配置未完成，跳过推送');
         return;
@@ -15,34 +15,14 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
     };
 
     const formattedDate = date.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
-    console.log(`📝 开始将 ${formattedDate} 的新闻整合推送到 Notion 一个页面中...`);
+    console.log(`📝 开始推送 ${formattedDate} 的极简纯净版新闻到 Notion...`);
 
-    // 1. 构建页面内的正文块 (Children Blocks)
     let childrenBlocks = [];
 
-    // 将总摘要以 Callout (标注框) 的形式放在正文最上方
-    childrenBlocks.push({
-        object: 'block',
-        type: 'callout',
-        callout: {
-            rich_text: [{ type: 'text', text: { content: abstract.substring(0, 2000) } }],
-            icon: { type: 'emoji', emoji: '💡' }
-        }
-    });
-
-    // 插入一条分割线
-    childrenBlocks.push({
-        object: 'block',
-        type: 'divider',
-        divider: {}
-    });
-
-    // 遍历组装每一条新闻
+    // 组装正文
     for (let i = 0; i < news.length; i++) {
         const item = news[i];
-        const link = newsLinks[i] || '';
-
-        // 新闻标题 (Heading 3)
+        
         childrenBlocks.push({
             object: 'block',
             type: 'heading_3',
@@ -51,60 +31,62 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
             }
         });
 
-        // 新闻详细内容 (Paragraph)，并处理 2000 字符限制
-        if (item.content) {
-            const safeContent = item.content.length > 2000 ? item.content.substring(0, 1995) + '...' : item.content;
-            childrenBlocks.push({
-                object: 'block',
-                type: 'paragraph',
-                paragraph: {
-                    rich_text: [{ type: 'text', text: { content: safeContent } }]
-                }
-            });
+        let cleanContent = item.content ? item.content.replace(/<[^>]+>/g, '').trim() : '无详细内容';
+        if (cleanContent.length > 2000) {
+            cleanContent = cleanContent.substring(0, 1995) + '...';
         }
 
-        // 原文链接
-        if (link) {
-            childrenBlocks.push({
-                object: 'block',
-                type: 'paragraph',
-                paragraph: {
-                    rich_text: [
-                        { type: 'text', text: { content: '🔗 查看原文', link: { url: link } } }
-                    ]
-                }
-            });
-        }
+        childrenBlocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+                rich_text: [{ type: 'text', text: { content: cleanContent } }]
+            }
+        });
+        
+        childrenBlocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: { rich_text: [] }
+        });
     }
 
-    // 处理 Notion API 单次 100 个 Block 的限制
-    // 每条新闻占用 3 个 Block，30条新闻就是 90 个，通常不会超。如果超了则进行截断。
-    if (childrenBlocks.length > 100) {
-        childrenBlocks = childrenBlocks.slice(0, 100);
-        console.log('⚠️ 新闻条目过多，为符合 Notion API 限制，已截断部分正文内容。');
+    if (childrenBlocks.length > 90) {
+        childrenBlocks = childrenBlocks.slice(0, 90);
     }
 
-// 2. 构建页面属性 (Properties)
+    // 提取的 Notion 官方自带图库 URL
+    const notionNativeCovers = [
+        "https://www.notion.so/images/page-cover/gradients_1.png",
+        "https://www.notion.so/images/page-cover/gradients_2.png",
+        "https://www.notion.so/images/page-cover/gradients_3.png",
+        "https://www.notion.so/images/page-cover/nasa_earth_grid.jpg",
+        "https://www.notion.so/images/page-cover/rijksmuseum_mignon_1660.jpg",
+        "https://www.notion.so/images/page-cover/woodcuts_1.jpg",
+        "https://www.notion.so/images/page-cover/woodcuts_2.jpg"
+    ];
+    // 随机选择一张
+    const randomCover = notionNativeCovers[Math.floor(Math.random() * notionNativeCovers.length)];
+
+    // 构建请求主体
     const body = {
         parent: { database_id: DATABASE_ID },
+        cover: {
+            type: 'external',
+            external: {
+                url: randomCover
+            }
+        },
         properties: {
-            // 请确保你的 Notion 数据库第一列（Title类型）的名字叫 Title
+            // 现在的属性只保留一个主键（Title），其值为日期
+            // 注意：请确保你的 Notion 数据库第一列（带 Aa 图标）的列名为 "Title"
             'Title': { 
-                title: [{ text: { content: `${formattedDate}` } }] 
-            },
-            // 请确保 Date 列的名字叫 Date
-            'Date': { 
-                date: { start: formattedDate } 
-            },
-            // 请确保摘要列的名字叫 Abstract，且类型为 Text (Rich text)
-            'Abstract': { 
-                rich_text: [{ text: { content: abstract ? abstract.substring(0, 2000) : '未获取到摘要' } }] 
+                title: [{ text: { content: formattedDate } }] 
             }
         },
         children: childrenBlocks
     };
 
-    // 3. 执行单次推送
     try {
         const response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
@@ -116,7 +98,7 @@ export async function pushToNotion({ date, abstract, news, newsLinks }) {
             const error = await response.text();
             console.error(`❌ 页面创建失败:`, error);
         } else {
-            console.log(`✅ ${formattedDate} 的整合页面已成功推送到 Notion！`);
+            console.log(`✅ 已成功推送！标题为 ${formattedDate}`);
         }
     } catch (err) {
         console.error(`❌ 推送异常:`, err.message);
